@@ -1,0 +1,37 @@
+{
+  "name": "pi-qmd",
+  "version": "1.0.0",
+  "description": "QMD (Quick Markdown Search) extension for pi coding agent - on-device knowledge base search with BM25, vector search, and LLM reranking",
+  "main": "extensions/qmd.ts",
+  "type": "module",
+  "keywords": [
+    "pi",
+    "pi-coding-agent",
+    "extension",
+    "qmd",
+    "search",
+    "knowledge-base",
+    "markdown",
+    "vector-search",
+    "semantic-search"
+  ],
+  "author": "hjanuschka",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hjanuschka/pi-qmd"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/qmd.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": ">=0.42.0"
+  },
+  "devDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "@sinclair/typebox": "*",
+    "typescript": "^5.0.0"
+  }
+}
