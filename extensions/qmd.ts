@@ -823,7 +823,7 @@ Use qmd_get with the docid or path to retrieve full content.`,
 			minScore: Type.Optional(Type.Number({ description: "Minimum score threshold 0-1 (default: 0)" })),
 		}),
 
-		async execute(toolCallId, params, onUpdate, ctx, signal) {
+		async execute(toolCallId, params, signal, onUpdate, ctx) {
 			const args = ["search", params.query, "--json"];
 			if (params.collection) args.push("-c", params.collection);
 			args.push("-n", String(params.count || 10));
@@ -877,7 +877,7 @@ Returns: path, docid, title, score, snippet.`,
 			count: Type.Optional(Type.Number({ description: "Number of results (default: 10)" })),
 		}),
 
-		async execute(toolCallId, params, onUpdate, ctx, signal) {
+		async execute(toolCallId, params, signal, onUpdate, ctx) {
 			const args = ["vsearch", params.query, "--json"];
 			if (params.collection) args.push("-c", params.collection);
 			args.push("-n", String(params.count || 10));
@@ -927,7 +927,7 @@ Returns: path, docid, title, score, snippet.`,
 			count: Type.Optional(Type.Number({ description: "Number of results (default: 10)" })),
 		}),
 
-		async execute(toolCallId, params, onUpdate, ctx, signal) {
+		async execute(toolCallId, params, signal, onUpdate, ctx) {
 			onUpdate?.({ content: [{ type: "text", text: "Running hybrid search with reranking..." }] });
 
 			const args = ["query", params.query, "--json"];
@@ -979,7 +979,7 @@ Supports fuzzy matching - if exact path not found, suggests alternatives.`,
 			maxLines: Type.Optional(Type.Number({ description: "Maximum lines to return" })),
 		}),
 
-		async execute(toolCallId, params, onUpdate, ctx, signal) {
+		async execute(toolCallId, params, signal, onUpdate, ctx) {
 			const args = ["get", params.path];
 			if (params.full !== false) args.push("--full");
 			if (params.fromLine) args.push("--from", String(params.fromLine));
@@ -1029,7 +1029,7 @@ Examples: "docs/*.md", "doc1.md, doc2.md", "#abc123, #def456"`,
 			maxLines: Type.Optional(Type.Number({ description: "Maximum lines per file" })),
 		}),
 
-		async execute(toolCallId, params, onUpdate, ctx, signal) {
+		async execute(toolCallId, params, signal, onUpdate, ctx) {
 			const args = ["multi-get", params.pattern];
 			if (params.maxBytes) args.push("--max-bytes", String(params.maxBytes));
 			if (params.maxLines) args.push("-l", String(params.maxLines));
@@ -1074,7 +1074,7 @@ Examples: "docs/*.md", "doc1.md, doc2.md", "#abc123, #def456"`,
 Shows: total documents, embedding status, collection names and paths.`,
 		parameters: Type.Object({}),
 
-		async execute(toolCallId, params, onUpdate, ctx, signal) {
+		async execute(toolCallId, params, signal, onUpdate, ctx) {
 			const result = await execQmd(pi, ["status", "--json"], signal);
 			
 			if (result.code !== 0) {
