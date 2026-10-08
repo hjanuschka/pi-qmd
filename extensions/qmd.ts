@@ -36,9 +36,9 @@
  */
 
 import { Type } from "@sinclair/typebox";
-import { StringEnum } from "@mariozechner/pi-ai";
-import type { ExtensionAPI, Theme } from "@mariozechner/pi-coding-agent";
-import { truncateHead, DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize, getMarkdownTheme, DynamicBorder } from "@mariozechner/pi-coding-agent";
+import { StringEnum } from "@earendil-works/pi-ai";
+import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
+import { truncateHead, DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize, getMarkdownTheme, DynamicBorder } from "@earendil-works/pi-coding-agent";
 import {
 	Container,
 	type Focusable,
@@ -48,11 +48,11 @@ import {
 	Spacer,
 	Text,
 	TUI,
-	getEditorKeybindings,
+	getKeybindings,
 	matchesKey,
 	truncateToWidth,
 	visibleWidth,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
@@ -148,6 +148,14 @@ async function execQmd(
 
 // QMD requires Bun runtime - see https://github.com/tobi/qmd
 const QMD_INSTALL_CMD = "brew install oven-sh/bun/bun && bun install -g https://github.com/tobi/qmd";
+
+function messageText(content: string | { type: string }[] | undefined): string {
+	if (!content) return "";
+	if (typeof content === "string") return content;
+	return content
+		.map((c) => (c.type === "text" ? (c as { type: string; text: string }).text : ""))
+		.join("");
+}
 
 // Common locations for qmd binary
 const QMD_PATHS = [
@@ -421,10 +429,10 @@ class QmdBrowserComponent extends Container implements Focusable {
 	}
 
 	handleInput(keyData: string): void {
-		const kb = getEditorKeybindings();
+		const kb = getKeybindings();
 
 		
-		if (kb.matches(keyData, "selectCancel") || matchesKey(keyData, Key.escape)) {
+		if (kb.matches(keyData, "tui.select.cancel") || matchesKey(keyData, Key.escape)) {
 			this.onDone(null);
 			return;
 		}
@@ -447,7 +455,7 @@ class QmdBrowserComponent extends Container implements Focusable {
 		}
 
 		if (this.focusMode === "results") {
-			if (kb.matches(keyData, "selectUp")) {
+			if (kb.matches(keyData, "tui.select.up")) {
 				if (this.results.length === 0) return;
 				this.selectedIndex = Math.max(0, this.selectedIndex - 1);
 				const selected = this.results[this.selectedIndex];
@@ -456,7 +464,7 @@ class QmdBrowserComponent extends Container implements Focusable {
 				return;
 			}
 
-			if (kb.matches(keyData, "selectDown")) {
+			if (kb.matches(keyData, "tui.select.down")) {
 				if (this.results.length === 0) return;
 				this.selectedIndex = Math.min(this.results.length - 1, this.selectedIndex + 1);
 				const selected = this.results[this.selectedIndex];
@@ -465,14 +473,14 @@ class QmdBrowserComponent extends Container implements Focusable {
 				return;
 			}
 
-			if (kb.matches(keyData, "selectConfirm")) {
+			if (kb.matches(keyData, "tui.select.confirm")) {
 				const selected = this.results[this.selectedIndex];
 				if (selected) this.onDone({ action: "load", doc: selected });
 				return;
 			}
 		}
 
-		if (kb.matches(keyData, "selectUp") || kb.matches(keyData, "selectDown")) {
+		if (kb.matches(keyData, "tui.select.up") || kb.matches(keyData, "tui.select.down")) {
 			if (this.results.length > 0) {
 				this.focusMode = "results";
 				this.updateList();
@@ -705,11 +713,11 @@ class QmdBrowserComponent extends Container implements Focusable {
 	}
 
 	private isPageUp(keyData: string): boolean {
-		return matchesKey(keyData, "pageup") || keyData === "\u001b[5~" || keyData === "\u001b[5;5~";
+		return matchesKey(keyData, "pageUp") || keyData === "\u001b[5~" || keyData === "\u001b[5;5~";
 	}
 
 	private isPageDown(keyData: string): boolean {
-		return matchesKey(keyData, "pagedown") || keyData === "\u001b[6~" || keyData === "\u001b[6;5~";
+		return matchesKey(keyData, "pageDown") || keyData === "\u001b[6~" || keyData === "\u001b[6;5~";
 	}
 
 	private renderMarkdownPreview(width: number): string[] {
@@ -786,7 +794,7 @@ class QmdBrowserComponent extends Container implements Focusable {
 		}
 
 		this.previewContent = result.stdout;
-		const initialWidth = Math.max(20, Math.floor((this.tui.cols * 0.7 - 8) * 0.55));
+		const initialWidth = Math.max(20, Math.floor((this.tui.terminal.columns * 0.7 - 8) * 0.55));
 		this.previewLines = this.renderMarkdownPreview(initialWidth);
 		this.previewRenderWidth = initialWidth;
 		this.previewLoading = false;
@@ -823,7 +831,7 @@ Use qmd_get with the docid or path to retrieve full content.`,
 			minScore: Type.Optional(Type.Number({ description: "Minimum score threshold 0-1 (default: 0)" })),
 		}),
 
-		async execute(toolCallId, params, onUpdate, ctx, signal) {
+		async execute(toolCallId, params, signal, onUpdate, ctx) {
 			const args = ["search", params.query, "--json"];
 			if (params.collection) args.push("-c", params.collection);
 			args.push("-n", String(params.count || 10));
@@ -835,6 +843,7 @@ Use qmd_get with the docid or path to retrieve full content.`,
 				return {
 					content: [{ type: "text", text: `QMD search failed: ${result.stderr || "Unknown error"}` }],
 					isError: true,
+					details: undefined,
 				};
 			}
 
@@ -877,7 +886,7 @@ Returns: path, docid, title, score, snippet.`,
 			count: Type.Optional(Type.Number({ description: "Number of results (default: 10)" })),
 		}),
 
-		async execute(toolCallId, params, onUpdate, ctx, signal) {
+		async execute(toolCallId, params, signal, onUpdate, ctx) {
 			const args = ["vsearch", params.query, "--json"];
 			if (params.collection) args.push("-c", params.collection);
 			args.push("-n", String(params.count || 10));
@@ -888,6 +897,7 @@ Returns: path, docid, title, score, snippet.`,
 				return {
 					content: [{ type: "text", text: `QMD vsearch failed: ${result.stderr || "Unknown error"}` }],
 					isError: true,
+					details: undefined,
 				};
 			}
 
@@ -927,8 +937,8 @@ Returns: path, docid, title, score, snippet.`,
 			count: Type.Optional(Type.Number({ description: "Number of results (default: 10)" })),
 		}),
 
-		async execute(toolCallId, params, onUpdate, ctx, signal) {
-			onUpdate?.({ content: [{ type: "text", text: "Running hybrid search with reranking..." }] });
+		async execute(toolCallId, params, signal, onUpdate, ctx) {
+			onUpdate?.({ content: [{ type: "text", text: "Running hybrid search with reranking..." }], details: undefined });
 
 			const args = ["query", params.query, "--json"];
 			if (params.collection) args.push("-c", params.collection);
@@ -940,6 +950,7 @@ Returns: path, docid, title, score, snippet.`,
 				return {
 					content: [{ type: "text", text: `QMD query failed: ${result.stderr || "Unknown error"}` }],
 					isError: true,
+					details: undefined,
 				};
 			}
 
@@ -979,7 +990,7 @@ Supports fuzzy matching - if exact path not found, suggests alternatives.`,
 			maxLines: Type.Optional(Type.Number({ description: "Maximum lines to return" })),
 		}),
 
-		async execute(toolCallId, params, onUpdate, ctx, signal) {
+		async execute(toolCallId, params, signal, onUpdate, ctx) {
 			const args = ["get", params.path];
 			if (params.full !== false) args.push("--full");
 			if (params.fromLine) args.push("--from", String(params.fromLine));
@@ -991,6 +1002,7 @@ Supports fuzzy matching - if exact path not found, suggests alternatives.`,
 				return {
 					content: [{ type: "text", text: `QMD get failed: ${result.stderr || "Unknown error"}` }],
 					isError: true,
+					details: undefined,
 				};
 			}
 
@@ -1029,7 +1041,7 @@ Examples: "docs/*.md", "doc1.md, doc2.md", "#abc123, #def456"`,
 			maxLines: Type.Optional(Type.Number({ description: "Maximum lines per file" })),
 		}),
 
-		async execute(toolCallId, params, onUpdate, ctx, signal) {
+		async execute(toolCallId, params, signal, onUpdate, ctx) {
 			const args = ["multi-get", params.pattern];
 			if (params.maxBytes) args.push("--max-bytes", String(params.maxBytes));
 			if (params.maxLines) args.push("-l", String(params.maxLines));
@@ -1040,6 +1052,7 @@ Examples: "docs/*.md", "doc1.md, doc2.md", "#abc123, #def456"`,
 				return {
 					content: [{ type: "text", text: `QMD multi-get failed: ${result.stderr || "Unknown error"}` }],
 					isError: true,
+					details: undefined,
 				};
 			}
 
@@ -1074,7 +1087,7 @@ Examples: "docs/*.md", "doc1.md, doc2.md", "#abc123, #def456"`,
 Shows: total documents, embedding status, collection names and paths.`,
 		parameters: Type.Object({}),
 
-		async execute(toolCallId, params, onUpdate, ctx, signal) {
+		async execute(toolCallId, params, signal, onUpdate, ctx) {
 			const result = await execQmd(pi, ["status", "--json"], signal);
 			
 			if (result.code !== 0) {
@@ -1084,6 +1097,7 @@ Shows: total documents, embedding status, collection names and paths.`,
 					return {
 						content: [{ type: "text", text: `QMD status failed: ${fallback.stderr || "Unknown error"}` }],
 						isError: true,
+						details: undefined,
 					};
 				}
 				return {
@@ -1210,7 +1224,7 @@ Shows: total documents, embedding status, collection names and paths.`,
 				
 				const result = await execQmd(pi, ["collection", "add", collPath, "--name", name]);
 				if (result.code === 0) {
-					ctx.ui.notify(`Added collection: ${name}`, "success");
+					ctx.ui.notify(`Added collection: ${name}`, "info");
 				} else {
 					ctx.ui.notify(result.stderr || "Failed to add collection", "error");
 				}
@@ -1221,7 +1235,7 @@ Shows: total documents, embedding status, collection names and paths.`,
 				ctx.ui.notify("Running embeddings... this may take a while", "info");
 				const result = await execQmd(pi, ["embed"]);
 				if (result.code === 0) {
-					ctx.ui.notify("Embeddings generated successfully", "success");
+					ctx.ui.notify("Embeddings generated successfully", "info");
 				} else {
 					ctx.ui.notify(result.stderr || "Embedding failed", "error");
 				}
@@ -1328,7 +1342,7 @@ Shows: total documents, embedding status, collection names and paths.`,
 					overlay: true,
 					overlayOptions: {
 						width: overlayWidth,
-						height: overlayHeight,
+						maxHeight: overlayHeight,
 						anchor: "center",
 					},
 				}
@@ -1344,7 +1358,7 @@ Shows: total documents, embedding status, collection names and paths.`,
 						display: true,
 						details: { path: result.doc.path, docid: result.doc.docid },
 					});
-					ctx.ui.notify(`Loaded: ${result.doc.path}`, "success");
+					ctx.ui.notify(`Loaded: ${result.doc.path}`, "info");
 				} else {
 					ctx.ui.notify(docResult.stderr || "Failed to load document", "error");
 				}
@@ -1358,12 +1372,12 @@ Shows: total documents, embedding status, collection names and paths.`,
 
 	pi.registerMessageRenderer("qmd-info", (message, _options, _theme) => {
 		const mdTheme = getMarkdownTheme();
-		return new Markdown(message.content || "", 0, 0, mdTheme);
+		return new Markdown(messageText(message.content), 0, 0, mdTheme);
 	});
 
 	pi.registerMessageRenderer("qmd-document", (message, options, theme) => {
 		const { expanded } = options;
-		const details = message.details || {};
+		const details = (message.details || {}) as { path?: string; docid?: string };
 		
 		let text = theme.fg("accent", `📚 QMD Document: ${details.path || "unknown"}\n`);
 		if (details.docid) {
@@ -1372,7 +1386,7 @@ Shows: total documents, embedding status, collection names and paths.`,
 		text += "\n";
 		
 		// Show content with optional truncation
-		const content = message.content || "";
+		const content = messageText(message.content);
 		if (!expanded && content.length > 500) {
 			text += content.slice(0, 500) + theme.fg("muted", "...\n(Press Ctrl+O to expand)");
 		} else {

@@ -15,6 +15,10 @@
 
 ### Prerequisites
 
+Requires pi (`@earendil-works/pi-coding-agent`) >= 1.0.0. Older
+`@mariozechner/pi-coding-agent` releases use a different tool callback
+signature and are not supported since pi-qmd 1.1.0.
+
 QMD requires [Bun](https://bun.sh) runtime:
 
 ```bash
