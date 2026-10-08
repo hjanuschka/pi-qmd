@@ -1,6 +1,6 @@
 {
   "name": "pi-qmd",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "QMD (Quick Markdown Search) extension for pi coding agent - on-device knowledge base search with BM25, vector search, and LLM reranking",
   "main": "extensions/qmd.ts",
   "type": "module",
@@ -27,10 +27,10 @@
     ]
   },
   "peerDependencies": {
-    "@mariozechner/pi-coding-agent": ">=0.42.0"
+    "@earendil-works/pi-coding-agent": ">=1.0.0"
   },
   "devDependencies": {
-    "@mariozechner/pi-coding-agent": "*",
+    "@earendil-works/pi-coding-agent": "*",
     "@sinclair/typebox": "*",
     "typescript": "^5.0.0"
   }
